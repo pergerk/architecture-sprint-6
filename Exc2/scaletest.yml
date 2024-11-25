@@ -1,0 +1,135 @@
+---
+# Source: scaletest/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "scaletest-test-connection"
+  labels:
+    helm.sh/chart: scaletest-0.1.4
+    app.kubernetes.io/name: scaletest
+    app.kubernetes.io/instance: scaletest
+    app.kubernetes.io/version: "1.16.4"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['scaletest:8080']
+  restartPolicy: Never
+---
+# Source: scaletest/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scaletest
+  labels:
+    helm.sh/chart: scaletest-0.1.4
+    app.kubernetes.io/name: scaletest
+    app.kubernetes.io/instance: scaletest
+    app.kubernetes.io/version: "1.16.4"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: scaletest/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: scaletest
+  labels:
+    helm.sh/chart: scaletest-0.1.4
+    app.kubernetes.io/name: scaletest
+    app.kubernetes.io/instance: scaletest
+    app.kubernetes.io/version: "1.16.4"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: scaletest
+    app.kubernetes.io/instance: scaletest
+---
+# Source: scaletest/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scaletest
+  labels:
+    helm.sh/chart: scaletest-0.1.4
+    app.kubernetes.io/name: scaletest
+    app.kubernetes.io/instance: scaletest
+    app.kubernetes.io/version: "1.16.4"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: scaletest
+      app.kubernetes.io/instance: scaletest
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: scaletest-0.1.4
+        app.kubernetes.io/name: scaletest
+        app.kubernetes.io/instance: scaletest
+        app.kubernetes.io/version: "1.16.4"
+        app.kubernetes.io/managed-by: Helm
+        scaletest: scaletest.pod-label
+    spec:
+      serviceAccountName: scaletest
+      securityContext:
+        {}
+      containers:
+        - name: scaletest
+          securityContext:
+            {}
+          image: "shestera/scaletestapp:latest"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 12Mi
+---
+# Source: scaletest/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: scaletest
+  labels:
+    helm.sh/chart: scaletest-0.1.4
+    app.kubernetes.io/name: scaletest
+    app.kubernetes.io/instance: scaletest
+    app.kubernetes.io/version: "1.16.4"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: scaletest
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
